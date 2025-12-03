@@ -9,6 +9,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import kotlinx.coroutines.launch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,6 +47,9 @@ fun MonthlySummaryScreen(
     val totalLiters = entries.sumOf { it.amountLiters }
     val totalCost = totalLiters * pricePerLiter
     val daysWithMilk = entries.count { it.amountLiters > 0 }
+    
+    var entryToDelete by remember { mutableStateOf<MilkEntry?>(null) }
+    val scope = rememberCoroutineScope()
     
     Scaffold(
         topBar = {
@@ -122,7 +127,7 @@ fun MonthlySummaryScreen(
                 SummaryCard(
                     modifier = Modifier.weight(1f),
                     title = "Total Cost",
-                    value = String.format("₹%.0f", totalCost),
+                    value = String.format("৳%.0f", totalCost),
                     backgroundColor = Success.copy(alpha = 0.15f)
                 )
             }
@@ -170,7 +175,7 @@ fun MonthlySummaryScreen(
                     
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = String.format("₹%.0f/L", pricePerLiter),
+                            text = String.format("৳%.0f/L", pricePerLiter),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             color = MilkBlue
@@ -216,7 +221,11 @@ fun MonthlySummaryScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(entries.sortedByDescending { it.date }) { entry ->
-                        DailyEntryItem(entry = entry, pricePerLiter = pricePerLiter)
+                        DailyEntryItem(
+                            entry = entry,
+                            pricePerLiter = pricePerLiter,
+                            onDeleteClick = { entryToDelete = entry }
+                        )
                     }
                     
                     item {
@@ -225,6 +234,37 @@ fun MonthlySummaryScreen(
                 }
             }
         }
+    }
+    
+    // Delete confirmation dialog
+    entryToDelete?.let { entry ->
+        val date = LocalDate.parse(entry.date)
+        AlertDialog(
+            onDismissRequest = { entryToDelete = null },
+            title = { Text("Delete Entry") },
+            text = {
+                Text(
+                    "Are you sure you want to delete the entry for ${date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy"))} (${entry.amountLiters}L)?"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            milkRepository.deleteEntry(entry.date)
+                        }
+                        entryToDelete = null
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { entryToDelete = null }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        )
     }
 }
 
@@ -265,7 +305,8 @@ fun SummaryCard(
 @Composable
 fun DailyEntryItem(
     entry: MilkEntry,
-    pricePerLiter: Double
+    pricePerLiter: Double,
+    onDeleteClick: () -> Unit
 ) {
     val date = LocalDate.parse(entry.date)
     val cost = entry.amountLiters * pricePerLiter
@@ -290,7 +331,7 @@ fun DailyEntryItem(
             }
             
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -301,10 +342,22 @@ fun DailyEntryItem(
                 )
                 
                 Text(
-                    text = String.format("₹%.0f", cost),
+                    text = String.format("৳%.0f", cost),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
+                
+                IconButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete entry",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

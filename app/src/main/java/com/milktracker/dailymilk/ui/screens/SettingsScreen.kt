@@ -233,7 +233,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(text = "₹", style = MaterialTheme.typography.titleLarge)
+                        Text(text = "৳", style = MaterialTheme.typography.titleLarge)
                         
                         OutlinedTextField(
                             value = priceInput,

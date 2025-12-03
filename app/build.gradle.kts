@@ -21,6 +21,21 @@ android {
         }
     }
 
+    // Check if signing should be enabled (when all required environment variables are present)
+    val signingEnabled = listOf("KEYSTORE_FILE", "KEYSTORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD")
+        .all { System.getenv(it) != null }
+
+    signingConfigs {
+        if (signingEnabled) {
+            create("release") {
+                storeFile = file(System.getenv("KEYSTORE_FILE")!!)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")!!
+                keyAlias = System.getenv("KEY_ALIAS")!!
+                keyPassword = System.getenv("KEY_PASSWORD")!!
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -28,6 +43,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
+            if (signingEnabled) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

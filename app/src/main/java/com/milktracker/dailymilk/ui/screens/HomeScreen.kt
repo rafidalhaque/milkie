@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +18,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -26,7 +31,9 @@ import com.milktracker.dailymilk.ui.theme.MilkBlue
 import com.milktracker.dailymilk.ui.theme.MilkBlueLight
 import com.milktracker.dailymilk.ui.theme.Success
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
@@ -39,25 +46,36 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val today = LocalDate.now()
-    val dateString = today.format(DateTimeFormatter.ISO_LOCAL_DATE)
+    var selectedDate by remember { mutableStateOf(today) }
+    val dateString = selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)
     
-    val todayEntry by milkRepository.getEntryByDateFlow(dateString).collectAsState(initial = null)
+    val currentEntry by milkRepository.getEntryByDateFlow(dateString).collectAsState(initial = null)
     
     var selectedAmount by remember { mutableStateOf<Double?>(null) }
     var customAmount by remember { mutableStateOf("") }
     var showCustomInput by remember { mutableStateOf(false) }
     var showSavedMessage by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
     
     val scope = rememberCoroutineScope()
     
-    // Update selected amount when entry changes
-    LaunchedEffect(todayEntry) {
-        todayEntry?.let { entry ->
+    val isToday = selectedDate == today
+    
+    // Update selected amount when entry changes or selected date changes
+    LaunchedEffect(currentEntry, selectedDate) {
+        currentEntry?.let { entry ->
             selectedAmount = entry.amountLiters
             if (entry.amountLiters != 0.0 && entry.amountLiters != 0.5 && entry.amountLiters != 1.0) {
                 customAmount = entry.amountLiters.toString()
                 showCustomInput = true
+            } else {
+                showCustomInput = false
+                customAmount = ""
             }
+        } ?: run {
+            selectedAmount = null
+            showCustomInput = false
+            customAmount = ""
         }
     }
     
@@ -95,26 +113,52 @@ fun HomeScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Date display
+            // Date display - clickable to change date
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "Change date. Currently selected: ${selectedDate.format(DateTimeFormatter.ofPattern("MMMM d, yyyy"))}"
+                    }
+                    .clickable { showDatePicker = true },
                 colors = CardDefaults.cardColors(containerColor = MilkBlueLight)
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = today.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MilkBlue
-                    )
-                    Text(
-                        text = today.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MilkBlue
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = selectedDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault()),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MilkBlue
+                        )
+                        Text(
+                            text = selectedDate.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")),
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MilkBlue
+                        )
+                        if (!isToday) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "(Past date)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MilkBlue.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Default.EditCalendar,
+                        contentDescription = "Change date",
+                        tint = MilkBlue,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -123,7 +167,7 @@ fun HomeScreen(
             
             // Question
             Text(
-                text = "How much milk did you receive today?",
+                text = if (isToday) "How much milk did you receive today?" else "How much milk did you receive on this day?",
                 style = MaterialTheme.typography.titleLarge,
                 textAlign = TextAlign.Center
             )
@@ -245,8 +289,8 @@ fun HomeScreen(
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // Today's entry status
-            todayEntry?.let { entry ->
+            // Entry status for selected date
+            currentEntry?.let { entry ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Success.copy(alpha = 0.1f))
@@ -265,13 +309,49 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Today's entry: ${entry.amountLiters}L recorded",
+                            text = if (isToday) "Today's entry: ${entry.amountLiters}L recorded" else "Entry for this date: ${entry.amountLiters}L recorded",
                             style = MaterialTheme.typography.bodyLarge,
                             color = Success
                         )
                     }
                 }
             }
+        }
+    }
+    
+    // Date Picker Dialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    val date = Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+                    return !date.isAfter(today)
+                }
+            }
+        )
+        
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK", color = MilkBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel", color = Color.Gray)
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
         }
     }
 }

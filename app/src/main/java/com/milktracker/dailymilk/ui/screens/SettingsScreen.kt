@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.milktracker.dailymilk.data.PreferencesRepository
 import com.milktracker.dailymilk.notification.NotificationHelper
+import com.milktracker.dailymilk.ui.UiConstants
 import com.milktracker.dailymilk.ui.theme.MilkBlue
 import kotlinx.coroutines.launch
 
@@ -237,7 +238,7 @@ fun SettingsScreen(
                         OutlinedTextField(
                             value = priceInput,
                             onValueChange = { value ->
-                                if (value.isEmpty() || value.matches(Regex("^\\d*\\.?\\d*$"))) {
+                                if (value.isEmpty() || value.matches(UiConstants.DECIMAL_INPUT_REGEX)) {
                                     priceInput = value
                                 }
                             },

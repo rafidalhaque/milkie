@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.milktracker.dailymilk.data.MilkRepository
+import com.milktracker.dailymilk.ui.UiConstants
 import com.milktracker.dailymilk.ui.theme.MilkBlue
 import com.milktracker.dailymilk.ui.theme.MilkBlueLight
 import com.milktracker.dailymilk.ui.theme.Success
@@ -186,7 +187,7 @@ fun HomeScreen(
                 OutlinedTextField(
                     value = customAmount,
                     onValueChange = { value ->
-                        if (value.isEmpty() || value.matches(Regex("^\\d*\\.?\\d*$"))) {
+                        if (value.isEmpty() || value.matches(UiConstants.DECIMAL_INPUT_REGEX)) {
                             customAmount = value
                             selectedAmount = value.toDoubleOrNull()
                         }

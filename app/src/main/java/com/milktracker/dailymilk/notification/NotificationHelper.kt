@@ -131,7 +131,7 @@ class NotificationHelper(private val context: Context) {
         )
         
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_day)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notification_title))
             .setContentText(context.getString(R.string.notification_text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

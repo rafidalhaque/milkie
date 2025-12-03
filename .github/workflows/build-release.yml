@@ -49,13 +49,13 @@ jobs:
     - name: Upload debug APK artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: anflow-debug-apks
+        name: milkie-debug-apks
         path: app/build/outputs/apk/debug/*.apk
         
     - name: Upload release APK artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: anflow-release-apks
+        name: milkie-release-apks
         path: app/build/outputs/apk/release/*.apk
 
   release:
@@ -88,7 +88,7 @@ jobs:
       
     # Reconstruct the keystore from GitHub secrets
     # The keystore should be base64 encoded and stored in KEYSTORE_BASE64 secret
-    # To create the secret: base64 -i anflow.keystore | pbcopy (macOS) or base64 -w 0 anflow.keystore (Linux)
+    # To create the secret: base64 -i milkie.keystore | pbcopy (macOS) or base64 -w 0 milkie.keystore (Linux)
     - name: Reconstruct keystore
       run: |
         echo "$KEYSTORE_BASE64" | base64 --decode > app/milkie.keystore
@@ -111,6 +111,7 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
+        token: ${{ secrets.GH_PAT }}
         tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
         name: Milkie ${{ steps.tag_name.outputs.TAG_NAME }}
         body: |
@@ -135,10 +136,7 @@ jobs:
           ### Requirements
           - Android 7.0 (API level 24) or higher
         files: |
-          app/build/outputs/apk/release/app-universal-release.apk
-          app/build/outputs/apk/release/app-arm64-v8a-release.apk
-          app/build/outputs/apk/release/app-armeabi-v7a-release.apk
-          app/build/outputs/apk/release/app-x86_64-release.apk
+          app/build/outputs/apk/release/*.apk
           app/build/outputs/apk/release/app-x86-release.apk
         draft: false
         prerelease: false

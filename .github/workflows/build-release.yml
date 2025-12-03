@@ -1,0 +1,144 @@
+name: Build and Release APK
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+      
+    - name: Run tests
+      run: ./gradlew test
+      
+    - name: Build debug APK
+      run: ./gradlew assembleDebug
+      
+    # Note: Release APKs are built unsigned in the main build job
+    # Signed release APKs are only created in the release job when tags are pushed
+    - name: Build release APK (unsigned)
+      run: ./gradlew assembleRelease
+      
+    - name: Upload debug APK artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: anflow-debug-apks
+        path: app/build/outputs/apk/debug/*.apk
+        
+    - name: Upload release APK artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: anflow-release-apks
+        path: app/build/outputs/apk/release/*.apk
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+      
+    # Reconstruct the keystore from GitHub secrets
+    # The keystore should be base64 encoded and stored in KEYSTORE_BASE64 secret
+    # To create the secret: base64 -i anflow.keystore | pbcopy (macOS) or base64 -w 0 anflow.keystore (Linux)
+    - name: Reconstruct keystore
+      run: |
+        echo "$KEYSTORE_BASE64" | base64 --decode > app/milkie.keystore
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      
+    # Build signed release APK using environment variables for signing
+    - name: Build signed release APK
+      env:
+        KEYSTORE_FILE: milkie.keystore
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      run: ./gradlew assembleRelease
+      
+    - name: Get tag name
+      id: tag_name
+      run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag_name.outputs.TAG_NAME }}
+        name: Milkie ${{ steps.tag_name.outputs.TAG_NAME }}
+        body: |
+          ## Milkie Android App Release ${{ steps.tag_name.outputs.TAG_NAME }}
+          
+          ### APK Download Options
+          
+          **For most users (recommended):**
+          - `app-universal-release.apk` - Works on all Android devices
+          
+          **For smaller downloads (architecture-specific):**
+          - `app-arm64-v8a-release.apk` - Modern Android devices (64-bit ARM)
+          - `app-armeabi-v7a-release.apk` - Older Android devices (32-bit ARM)
+          - `app-x86_64-release.apk` - Intel-based devices (64-bit)
+          - `app-x86-release.apk` - Intel-based devices (32-bit)
+          
+          ### Installation
+          1. Download the appropriate APK file above (use universal if unsure)
+          2. Enable "Install from unknown sources" in your Android settings
+          3. Install the APK
+          
+          ### Requirements
+          - Android 7.0 (API level 24) or higher
+        files: |
+          app/build/outputs/apk/release/app-universal-release.apk
+          app/build/outputs/apk/release/app-arm64-v8a-release.apk
+          app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+          app/build/outputs/apk/release/app-x86_64-release.apk
+          app/build/outputs/apk/release/app-x86-release.apk
+        draft: false
+        prerelease: false
